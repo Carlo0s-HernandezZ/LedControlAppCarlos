@@ -1,74 +1,178 @@
+
 import React, { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  Button,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  Alert,
+  RefreshControl,
+} from "react-native";
 
-const API_URL = "http://192.168.1.14:3000/led"; 
+const API_URL = "http://192.168.1.22:3000"; // Cambia IP/puerto si es necesario
 
-export default function App() {
-  const [LedOn, setLedOn] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // función para obtener el estado del led
-const fetchLedStatus = async () => {
-  try {
-    const response = await fetch(API_URL);
-    const data = await response.json();
-
-    console.log("JSON recibido del backend:", data); // <--- AGREGA ESTO
-
-    setLedOn(data.estado === 1);
-  } catch (error) {
-    console.error("Error al obtener el estado del LED:", error);
-  } finally {
-    setLoading(false);
-  }
+type LedInfo = {
+  id: number;
+  on: boolean;
+  loading: boolean;
 };
 
-  // función para cambiar el estado del led
-  const toggleLed = async () => {
-    const newState = LedOn ? 0 : 1;
+export default function App() {
+  const [leds, setLeds] = useState<LedInfo[]>([
+    { id: 1, on: false, loading: true },
+    { id: 2, on: false, loading: true },
+    { id: 3, on: false, loading: true },
+  ]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchLedStatus = async (id: number) => {
     try {
-      await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-type": "application/json" },
-        body: JSON.stringify({ estado: newState }),
+      const res = await fetch(`${API_URL}/historial?led_id=${id}`);
+      const data = await res.json();
+      if (data.length > 0) {
+        const last = data[0];
+        return last.estado === "ENCENDIDO";
+      }
+      return false;
+    } catch (err) {
+      console.error(`Error obteniendo estado LED ${id}:`, err);
+      return false;
+    }
+  };
+
+  const loadAllStatuses = async () => {
+    setRefreshing(true);
+    const updated = await Promise.all(
+      leds.map(async (led) => {
+        const on = await fetchLedStatus(led.id);
+        return { ...led, on, loading: false };
+      })
+    );
+    setLeds(updated);
+    setRefreshing(false);
+  };
+
+  const toggleLed = async (id: number, currentState: boolean) => {
+    try {
+      await fetch(`${API_URL}/led/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: !currentState }),
       });
-      setLedOn(!LedOn);
-    } catch (error) {
-      console.error("Error al cambiar el estado del led", error);
+      setLeds((prev) =>
+        prev.map((led) =>
+          led.id === id ? { ...led, on: !currentState } : led
+        )
+      );
+    } catch (err) {
+      console.error(`Error al cambiar el estado del LED ${id}:`, err);
+      Alert.alert("Error", "No se pudo cambiar el estado del LED.");
+    }
+  };
+
+  const showHistorial = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/historial?led_id=${id}`);
+      const data = await res.json();
+      const texto =
+        data.length === 0
+          ? "Sin eventos."
+          : data
+              .map(
+                (e: any) =>
+                  `${e.timestamp} → ${e.estado === "ENCENDIDO" ? "ON" : "OFF"}`
+              )
+              .join("\n");
+      Alert.alert(`Historial LED ${id}`, texto);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "No se pudo obtener el historial.");
+    }
+  };
+
+  const showReporte = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/reportes?led_id=${id}`);
+      const data = await res.json();
+      const texto =
+        data.length === 0
+          ? "Sin reportes."
+          : data
+              .map(
+                (r: any) =>
+                  `${r.inicio} ⟶ ${r.fin} | ${r.duracion_formato}`
+              )
+              .join("\n");
+      Alert.alert(`Reporte LED ${id}`, texto);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "No se pudo obtener el reporte.");
     }
   };
 
   useEffect(() => {
-    fetchLedStatus();
+    loadAllStatuses();
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Cargando...</Text>
-      </View>
-    );
-  }
+  const renderLed = ({ item }: { item: LedInfo }) => (
+    <View style={styles.card}>
+      {item.loading ? (
+        <ActivityIndicator size="small" />
+      ) : (
+        <>
+          <Text style={styles.title}>LED {item.id}</Text>
+          <Text style={styles.status}>
+            Estado: {item.on ? "Encendido" : "Apagado"}
+          </Text>
+          <View style={styles.row}>
+            <Button
+              title={item.on ? "Apagar" : "Encender"}
+              onPress={() => toggleLed(item.id, item.on)}
+            />
+            <Button
+              title="Historial"
+              onPress={() => showHistorial(item.id)}
+              color="#6a5acd"
+            />
+            <Button
+              title="Reporte"
+              onPress={() => showReporte(item.id)}
+              color="#20b2aa"
+            />
+          </View>
+        </>
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>
-          Estado del LED: {LedOn ? "Encendido" : "Apagado"} ({String(LedOn)})
-      </Text>
-      <Button title={LedOn ? "Apagar" : "Encender"} onPress={toggleLed} />
+      <FlatList
+        data={leds}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderLed}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={loadAllStatuses} />
+        }
+        contentContainerStyle={{ paddingBottom: 40 }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  text: {
-    fontSize: 20,
+  container: { flex: 1, paddingTop: 60, backgroundColor: "#f5f5f5" },
+  card: {
+    marginHorizontal: 20,
     marginBottom: 20,
+    padding: 20,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    elevation: 3,
   },
+  title: { fontSize: 22, fontWeight: "bold", marginBottom: 6 },
+  status: { fontSize: 18, marginBottom: 12 },
+  row: { flexDirection: "row", justifyContent: "space-between" },
 });
