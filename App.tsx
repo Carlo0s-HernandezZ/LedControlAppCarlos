@@ -1,4 +1,5 @@
 
+// Importaciones necesarias para componentes de React Native
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -9,10 +10,14 @@ import {
   FlatList,
   Alert,
   RefreshControl,
+  ScrollView,
 } from "react-native";
+import GraficaBarras from "./GraficaBarras"; // Componente de gráfico de barras
+import GraficaLineas from "./GraficaLineas"; // Componente de gráfico de líneas
 
-const API_URL = "http://192.168.1.22:3000"; // Cambia IP/puerto si es necesario
+const API_URL = "http://192.168.1.22:3000"; // Dirección base de la API
 
+// Tipo para representar un LED
 type LedInfo = {
   id: number;
   on: boolean;
@@ -20,13 +25,18 @@ type LedInfo = {
 };
 
 export default function App() {
+  // Estados para LEDs, carga, y qué gráfico mostrar
   const [leds, setLeds] = useState<LedInfo[]>([
     { id: 1, on: false, loading: true },
     { id: 2, on: false, loading: true },
     { id: 3, on: false, loading: true },
   ]);
   const [refreshing, setRefreshing] = useState(false);
+  const [mostrarBarras, setMostrarBarras] = useState(false);
+  const [mostrarLineas, setMostrarLineas] = useState(false);
+  const [ledSeleccionado, setLedSeleccionado] = useState<number | null>(null);
 
+  // Consulta el estado más reciente de un LED
   const fetchLedStatus = async (id: number) => {
     try {
       const res = await fetch(`${API_URL}/historial?led_id=${id}`);
@@ -42,6 +52,7 @@ export default function App() {
     }
   };
 
+  // Actualiza el estado de todos los LEDs al inicio o al refrescar
   const loadAllStatuses = async () => {
     setRefreshing(true);
     const updated = await Promise.all(
@@ -54,6 +65,7 @@ export default function App() {
     setRefreshing(false);
   };
 
+  // Cambia el estado de encendido de un LED y guarda el cambio
   const toggleLed = async (id: number, currentState: boolean) => {
     try {
       await fetch(`${API_URL}/led/${id}`, {
@@ -72,6 +84,7 @@ export default function App() {
     }
   };
 
+  // Muestra el historial de eventos de un LED
   const showHistorial = async (id: number) => {
     try {
       const res = await fetch(`${API_URL}/historial?led_id=${id}`);
@@ -92,30 +105,12 @@ export default function App() {
     }
   };
 
-  const showReporte = async (id: number) => {
-    try {
-      const res = await fetch(`${API_URL}/reportes?led_id=${id}`);
-      const data = await res.json();
-      const texto =
-        data.length === 0
-          ? "Sin reportes."
-          : data
-              .map(
-                (r: any) =>
-                  `${r.inicio} ⟶ ${r.fin} | ${r.duracion_formato}`
-              )
-              .join("\n");
-      Alert.alert(`Reporte LED ${id}`, texto);
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "No se pudo obtener el reporte.");
-    }
-  };
-
+  // Efecto que se ejecuta al iniciar la app
   useEffect(() => {
     loadAllStatuses();
   }, []);
 
+  // Renderiza un card por LED
   const renderLed = ({ item }: { item: LedInfo }) => (
     <View style={styles.card}>
       {item.loading ? (
@@ -137,9 +132,13 @@ export default function App() {
               color="#6a5acd"
             />
             <Button
-              title="Reporte"
-              onPress={() => showReporte(item.id)}
-              color="#20b2aa"
+              title="Ver Gráfico Línea"
+              onPress={() => {
+                setLedSeleccionado(item.id);
+                setMostrarLineas(true);
+                setMostrarBarras(false);
+              }}
+              color="#ff8c00"
             />
           </View>
         </>
@@ -147,8 +146,9 @@ export default function App() {
     </View>
   );
 
+  // UI principal
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <FlatList
         data={leds}
         keyExtractor={(item) => item.id.toString()}
@@ -156,14 +156,32 @@ export default function App() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={loadAllStatuses} />
         }
-        contentContainerStyle={{ paddingBottom: 40 }}
+        scrollEnabled={false}
       />
-    </View>
+
+      {/* Botón para gráfico de barras */}
+      <View style={{ margin: 20 }}>
+        <Button
+          title="Ver Gráfico de Barras (Tiempo encendido/apagado)"
+          onPress={() => {
+            setMostrarBarras(true);
+            setMostrarLineas(false);
+          }}
+        />
+      </View>
+
+      {/* Condicional para mostrar gráficas */}
+      {mostrarBarras && <GraficaBarras />}
+      {mostrarLineas && ledSeleccionado !== null && (
+        <GraficaLineas ledId={ledSeleccionado} />
+      )}
+    </ScrollView>
   );
 }
 
+// Estilos de la interfaz
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, backgroundColor: "#f5f5f5" },
+  container: { paddingTop: 60, paddingBottom: 40, backgroundColor: "#f5f5f5" },
   card: {
     marginHorizontal: 20,
     marginBottom: 20,
