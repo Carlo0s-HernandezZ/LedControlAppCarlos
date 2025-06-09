@@ -4,7 +4,7 @@ import { BarChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
 
 const screenWidth = Dimensions.get("window").width;
-const API_URL = "http://192.168.1.22:3000"; // Cambia a tu IP real si es necesario
+const API_URL = "http://192.168.1.22:3000";
 
 export default function GraficaBarras() {
   const [datos, setDatos] = useState<any[]>([]);
@@ -14,7 +14,12 @@ export default function GraficaBarras() {
     fetch(`${API_URL}/estadisticas/tiempos`)
       .then((res) => res.json())
       .then((data) => {
-        setDatos(data);
+        if (Array.isArray(data)) {
+          setDatos(data);
+        } else {
+          console.error("Respuesta inesperada:", data);
+          setDatos([]);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -23,38 +28,40 @@ export default function GraficaBarras() {
       });
   }, []);
 
-  // Extraer IDs de LEDs únicos
-  const leds = [...new Set(datos.map((d) => d.led_id))];
+  if (loading) return <ActivityIndicator size="large" />;
 
-  // Obtener horas encendido por LED
+  if (!Array.isArray(datos) || datos.length === 0) {
+    return <Text style={styles.titulo}>No hay datos para mostrar.</Text>;
+  }
+
+  const leds = [...new Set(datos.map((d) => d.led_id))];
   const encendidos = leds.map(
     (id) =>
       datos.find((d) => d.led_id === id && d.estado === "ENCENDIDO")?.total_horas || 0
   );
 
-  if (loading) return <ActivityIndicator size="large" />;
-
   return (
     <View>
-<BarChart
-  data={{
-    labels: leds.map((id) => `LED ${id}`),
-    datasets: [{ data: encendidos }],
-  }}
-  width={screenWidth - 32}
-  height={220}
-  yAxisLabel="" //obligatorio aunque esté vacío
-  yAxisSuffix="h"
-  fromZero
-  chartConfig={{
-    backgroundGradientFrom: "#fff",
-    backgroundGradientTo: "#fff",
-    decimalPlaces: 1,
-    color: (opacity = 1) => `rgba(0, 123, 255, ${opacity})`,
-    labelColor: () => "#333",
-  }}
-  verticalLabelRotation={0}
-/>
+      <Text style={styles.titulo}>Horas Encendido por LED</Text>
+      <BarChart
+        data={{
+          labels: leds.map((id) => `LED ${id}`),
+          datasets: [{ data: encendidos }],
+        }}
+        width={screenWidth - 32}
+        height={220}
+        yAxisLabel=""
+        yAxisSuffix="h"
+        fromZero
+        chartConfig={{
+          backgroundGradientFrom: "#fff",
+          backgroundGradientTo: "#fff",
+          decimalPlaces: 1,
+          color: (opacity = 1) => `rgba(0, 123, 255, ${opacity})`,
+          labelColor: () => "#333",
+        }}
+        verticalLabelRotation={0}
+      />
     </View>
   );
 }
