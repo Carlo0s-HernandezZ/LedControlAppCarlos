@@ -5,7 +5,7 @@ import { LineChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
 
 const screenWidth = Dimensions.get("window").width;
-const API_URL = "http://192.168.1.22:3000"; // Dirección de tu API
+const API_URL = "http://192.168.222.156:3000"; // Dirección API
 
 type Props = {
   ledId: number;

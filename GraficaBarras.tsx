@@ -4,7 +4,7 @@ import { BarChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
 
 const screenWidth = Dimensions.get("window").width;
-const API_URL = "http://192.168.1.22:3000";
+const API_URL = "http://192.168.222.156:3000";
 
 export default function GraficaBarras() {
   const [datos, setDatos] = useState<any[]>([]);

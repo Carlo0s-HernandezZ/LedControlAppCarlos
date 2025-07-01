@@ -1,5 +1,5 @@
 
-// Importaciones necesarias para componentes de React Native
+// Importaciones React Native
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -12,10 +12,10 @@ import {
   RefreshControl,
   ScrollView,
 } from "react-native";
-import GraficaBarras from "./GraficaBarras"; // Componente de gráfico de barras
-import GraficaLineas from "./GraficaLineas"; // Componente de gráfico de líneas
+import GraficaBarras from "./GraficaBarras"; // Componente de grafico de barras
+import GraficaLineas from "./GraficaLineas"; // Componente de grafico de líneas
 
-const API_URL = "http://192.168.1.22:3000"; // Dirección base de la API
+const API_URL = "http://172.16.100.128:3000"; // Direccion base de la API
 
 // Tipo para representar un LED
 type LedInfo = {
@@ -36,7 +36,7 @@ export default function App() {
   const [mostrarLineas, setMostrarLineas] = useState(false);
   const [ledSeleccionado, setLedSeleccionado] = useState<number | null>(null);
 
-  // Consulta el estado más reciente de un LED
+  // Consulta el estado mas reciente de un LED
   const fetchLedStatus = async (id: number) => {
     try {
       const res = await fetch(`${API_URL}/historial?led_id=${id}`);
